@@ -1,585 +1,542 @@
-﻿#include <iostream>
-#include <list>
-#include <map>
-#include <set>
-#include <unordered_set>
-#include <vector>
-#include <queue>
-#include<math.h>
-#include<algorithm>
-#include <glm/gtc/matrix_inverse.hpp>
+#include <random>
+
 #include <spdlog/spdlog.h>
 
-#include "Labs/2-GeometryProcessing/DCEL.hpp"
-#include "Labs/2-GeometryProcessing/tasks.h"
+#include "Labs/1-Drawing2D/tasks.h"
 
-#define pi acos(-1)
+using VCX::Labs::Common::ImageRGB;
 
-namespace VCX::Labs::GeometryProcessing {
+template<class T>
+T Max(T a, T b) {
+    return a > b ? a : b;
+}
 
-#include "Labs/2-GeometryProcessing/marching_cubes_table.h"
-
-    /******************* 1. Mesh Subdivision *****************/
-    void SubdivisionMesh(Engine::SurfaceMesh const & input, Engine::SurfaceMesh & output, std::uint32_t numIterations) {
-        Engine::SurfaceMesh tmp = input;
-        int                 T   = numIterations;
-        while (T--) {
-            std::vector<glm::vec3> new_Positions;
-            DCEL                   links;
-            links.AddFaces(tmp.Indices);
-            if (! links.IsValid()) {
-                printf("links is invalid\n");
+template<class T>
+T Min(T a, T b) {
+    return a < b ? a : b;
+}
+int C(int m, int n) {
+    if (n == 0 || m == n) return 1;
+    return C(m - 1, n) + C(m - 1, n - 1);
+}
+namespace VCX::Labs::Drawing2D {
+    /******************* 1.Image Dithering *****************/
+    void DitheringThreshold(
+        ImageRGB &       output,
+        ImageRGB const & input) {
+        for (std::size_t x = 0; x < input.GetSizeX(); ++x)
+            for (std::size_t y = 0; y < input.GetSizeY(); ++y) {
+                glm::vec3 color = input[{ x, y }];
+                output.SetAt({ x, y }, {
+                                           color.r > 0.5 ? 1 : 0,
+                                           color.g > 0.5 ? 1 : 0,
+                                           color.b > 0.5 ? 1 : 0,
+                                       });
             }
-
-            std::size_t oldv_cnt = tmp.Positions.size(); //原来的顶点的数量
-
-            std::map<unsigned long long, int> edge_to_point;//记录 from to这条边上新产生的点
-            //from to 这条边是(unsigned long long) e->From() * oldv_cnt + e->To())，类似二维数组
-
-            //遍历原有的每一条边，在边上产生新的顶点，计算它们的位置，并在新 Mesh 中连接顶点，形成新的面
-            for (DCEL::HalfEdge const * e : links.GetEdges()) {
-                if (edge_to_point.count((unsigned long long) e->From() * oldv_cnt + e->To())) //这条边已经产生过顶点了
-                    continue;
-
-                glm::vec3 new_vertex = (float) 3 / 8 * tmp.Positions[e->From()]
-                    + (float) 3 / 8 * tmp.Positions[e->To()]
-                    + (float) 1 / 8 * tmp.Positions[e->OppositeVertex()]
-                    + (float) 1 / 8 * tmp.Positions[e->PairOppositeVertex()];
-
-                tmp.Positions.push_back(new_vertex);
-                new_Positions.push_back(new_vertex);
-
-                edge_to_point[(unsigned long long) e->From() * oldv_cnt + e->To()] = tmp.Positions.size() - 1; //新产生的这个点
-                edge_to_point[(unsigned long long) e->To() * oldv_cnt + e->From()] = tmp.Positions.size() - 1;
-            }
-            //对于原有的每个顶点，将它们加入到新 Mesh 中，在新 Mesh 中重新计算它们的位置
-            for (int i = 0; i < oldv_cnt; i++) {
-                DCEL::Vertex          v        = links.GetVertex(i);
-                std::vector<uint32_t> Neighbor = v.GetNeighbors();
-                int                   n        = Neighbor.size();
-                //权重
-                float w = (5.0 / 8.0 - (3.0 / 8.0 + 1.0 / 4.0 * cos(2 * pi / n)) * (3.0 / 8.0 + 1.0 / 4.0 * cos(2 * pi / n))) / (float) n;
-
-                tmp.Positions[i] = (1 - n * w) * tmp.Positions[i];
-                for (int j = 0; j < n; j++) {
-                    tmp.Positions[i] += w * tmp.Positions[Neighbor[j]];
-                }
-            }
-            tmp.Indices.clear();//在新 Mesh 中连接顶点，形成新的面
-            for (DCEL::Triangle const & f : links.GetFaces()) {
-                int idx[3]; //这个面上新产生的三个点的idx
-                idx[0] = edge_to_point[(unsigned long long) f.Edges(0)->From() * oldv_cnt + f.Edges(0)->To()];
-                idx[1] = edge_to_point[(unsigned long long) f.Edges(1)->From() * oldv_cnt + f.Edges(1)->To()];
-                idx[2] = edge_to_point[(unsigned long long) f.Edges(2)->From() * oldv_cnt + f.Edges(2)->To()];
-
-                //按照一个面一个面的顺序放进去 原先的一个面变四个面
-                tmp.Indices.push_back(idx[0]);
-                tmp.Indices.push_back(idx[1]);
-                tmp.Indices.push_back(idx[2]);
-
-                tmp.Indices.push_back(*f.Indices(0));
-                tmp.Indices.push_back(idx[2]);
-                tmp.Indices.push_back(idx[1]);
-
-                tmp.Indices.push_back(*f.Indices(1));
-                tmp.Indices.push_back(idx[0]);
-                tmp.Indices.push_back(idx[2]);
-
-                tmp.Indices.push_back(*f.Indices(2));
-                tmp.Indices.push_back(idx[1]);
-                tmp.Indices.push_back(idx[0]);
-            }
-        }
-        output = tmp;
     }
 
-
-
-
-    /******************* 2. Mesh Parameterization *****************/
-    void Parameterization(Engine::SurfaceMesh const & input, Engine::SurfaceMesh & output, const std::uint32_t numIterations) {
-        DCEL links;
-        links.AddFaces(input.Indices); // initialize
-        if (! links.IsValid()) {
-            // we check if the mesh is valid
-            printf("links is in valid\n");
-        }
-        std::vector<int> boundary;
-        int n = input.Positions.size();
-        int first_side = 0;
-        for (int i = 0; i < n; i++) {
-            DCEL::Vertex v = links.GetVertex(i);
-            if (v.IsSide()) {
-                first_side = i;
-                break;
-               
-            }
-        }
-        int las = -1;
-        int cur = first_side;
-        //要顺着找一圈 因为边界是顺着映射到uv的边界
-        boundary.push_back(first_side);
-        while (las == -1 || cur != first_side) {
-            DCEL::Vertex v = links.GetVertex(cur);
-            if (las == -1 || v.GetSideNeighbors().first == las) {
-                las = cur;
-                cur = v.GetSideNeighbors().second;
-            } else {
-                las = cur;
-                cur = v.GetSideNeighbors().first;
-            }
-            boundary.push_back(cur);
-        }
-        int boundary_num = boundary.size();
-        int vertex_num   = input.Positions.size();
-        printf("boudary points:%d\n", boundary_num);
-        std::vector<glm::vec2> uv;
-        for (int i = 0; i < vertex_num; ++i) {
-            uv.push_back(glm::vec2(0, 0)); // uv坐标初始化
-        }
-        float t = 1.0 / boundary_num;
-        for (int i = 0; i < boundary_num; ++i) {
-            uv[boundary[i]].x = 0.5 + 0.5 * cos(2 * pi * t * i); //需要保证在[0,1]^2之内。
-            uv[boundary[i]].y = 0.5 + 0.5 * sin(2 * pi * t * i);
-        }
-        //迭代求解中间点的uv坐标
-        int T = numIterations;
-        while (T--) {
-            std::vector<glm::vec2> tmp;
-            for (int i = 0; i < vertex_num; ++i) {
-                tmp.push_back(uv[i]);
-            }
-            for (int i = 0; i < vertex_num; ++i) {
-                DCEL::Vertex v = links.GetVertex(i); // get vertex with index i
-
-                if (v.IsSide()) { //检查边界点
-                    continue;
-                }
-                uv[i]                               = glm::vec2(0, 0);
-                std::vector<uint32_t> Neighbor      = v.GetNeighbors();
-                int                   neighbor_size = v.GetNeighbors().size();
-                float                 lamda         = 1.0 / neighbor_size; //简单起见可以使用 入ij=1/ni 的平均权重
-                for (int j = 0; j < neighbor_size; j++)
-                    uv[i] += lamda * tmp[Neighbor[j]];
-            }
-        }
-        //输出的 output Mesh 的 TexCoords 应该保存每个顶点的 UV 坐标
-        output = input;
-        for (int i = 0; i < n; i++) {
-            output.TexCoords.push_back(uv[i]);
-        }
+    void DitheringRandomUniform(
+        ImageRGB &       output,
+        ImageRGB const & input) {
+        // your code here:
         
-    }
+        for (std::size_t x = 0; x < input.GetSizeX(); ++x)
+            for (std::size_t y = 0; y < input.GetSizeY(); ++y) {
 
-
-
-
-
-
-    /******************* 3. Mesh Simplification *****************/
-    struct point_pair {
-        int i;
-        int j;
-        float cost;
-        glm::vec3 v;//最优收缩点
-        bool      operator<(const point_pair & p) const {
-                 return cost < p.cost;
-        }
-    };
-    std::set<std::pair<int,int>>edges;//存储有边的两个顶点
-    std::set<point_pair>          pointpair;//存储点对
-
-    glm::mat4 calKp(glm::vec3 p1, glm::vec3 p2, glm::vec3 p3) {
-        //p = [ a, b, c, d ] 其中a ^ 2 + b ^ 2 + c ^ 2 = 1
-        float a = 0, b = 0, c = 0, d = 0;
-        a = ((p2.y - p1.y) * (p3.z - p1.z) - (p2.z - p1.z) * (p3.y - p1.y));
-
-        b = ((p2.z - p1.z) * (p3.x - p1.x) - (p2.x - p1.x) * (p3.z - p1.z));
-
-        c = ((p2.x - p1.x) * (p3.y - p1.y) - (p2.y - p1.y) * (p3.x - p1.x));
-
-        d = (0 - (a * p1.x + b * p1.y + c * p1.z));
-
-        //正则化，使a^2+b^2+c^2=1
-        float nolm = sqrt(a * a + b * b + c * c);
-        a /= nolm;
-        b /= nolm;
-        c /= nolm;
-        d /= nolm;
-
-        // Kp=ppT 
-        glm::mat4 Kp;//4*4的矩阵
-        float       p[4] = { a, b, c, d };
-        for (int i = 0; i < 4; ++i) {
-            for (int j = 0; j < 4; ++j) {
-                Kp[i][j] = p[i] * p[j];
+                double a = rand() / (double) (RAND_MAX); //����0-1֮��������
+                a -= 0.5;                                //-0.5��0.5֮��������
+                glm::vec3 color = input[{ x, y }];
+                output.SetAt({ x, y }, {
+                                           color.r+a > 0.5 ? 1 : 0,
+                                           color.g+a > 0.5 ? 1 : 0,
+                                           color.b+a > 0.5 ? 1 : 0,
+                                       });
             }
-        }
-        return Kp;
     }
-    float cal_cost(glm::vec4 v, glm::mat4 Q) {
-        //vTQv
-        glm::vec4 tmp = glm::vec4(0,0,0,0);
-        for (int i = 0; i < 4; ++i)
-            for (int j = 0; j < 4; ++j) {
-                tmp[i] += v[j] * Q[j][i];
+
+    void DitheringRandomBlueNoise(
+        ImageRGB &       output,
+        ImageRGB const & input,
+        ImageRGB const & noise) {
+        // your code here:
+        for (std::size_t x = 0; x < input.GetSizeX(); ++x)
+            for (std::size_t y = 0; y < input.GetSizeY(); ++y) {
+                glm::vec3 color1 = input[{ x, y }];
+                glm::vec3 color2 = noise[{ x, y }];//0-1֮��
+                output.SetAt({ x, y }, {
+                                           color1.r+color2.r-0.5 > 0.5 ? 1 : 0,
+                                           color1.g+color2.g-0.5 > 0.5 ? 1 : 0,
+                                           color1.b+color2.b-0.5 > 0.5 ? 1 : 0,
+                                       });
             }
+    }
 
-        float     cost = 0;
-        glm::vec4 tmp2 = glm::vec4(0, 0, 0, 0);
-        for (int i = 0; i < 4; ++i) {
-            cost += tmp[i] * v[i];
-        }
-        return cost;
-    }
-    float cal_best(glm::vec3 vi, glm::vec3 vj,glm::vec3 & pos, glm::mat4  Q) { //求解最优的收缩点 计算一对顶点对的代价
-        glm::mat4 Q_new = Q;
-        glm::mat4 Qtmp  = Q_new;
-        for (int j = 0; j < 3; ++j) {
-            Qtmp[3][j] = 0;
-        }
-        Qtmp[3][3] = 1;
-        if (std::fabs(glm::determinant(Qtmp)) > 0.001) {//行列式   如果行列式为0会不可逆
-            Qtmp        = glm::inverse(Qtmp);
-            glm::vec4 v = glm::vec4(Qtmp[0][3], Qtmp[1][3], Qtmp[2][3], Qtmp[3][3]);
-            pos.x       = v.x;
-            pos.y       = v.y;
-            pos.z       = v.z; //最优收缩点
-            float cost  = cal_cost(v, Q_new);
+    void DitheringOrdered(
+        ImageRGB &       output,
+        ImageRGB const & input) {
+        // your code here:
+        int order[11][3][3] = {
+            {{ 0, 0, 0 },
+             { 0, 0, 0 },
+             { 0, 0, 0 }},//[0,0.1)
 
-            return cost;
-        } else {
-            pos = (vi + vj);//不可逆就取中点
-            pos /= 2;
-            glm::vec4 v    = glm::vec4(pos.x, pos.y, pos.z, 1);
-            float     cost = cal_cost(v, Q_new);
-            return cost;
-        }
-    }
-    float distance(glm::vec3 vi, glm::vec3 vj) {
-        return sqrt((vi.x - vj.x) * (vi.x - vj.x) + (vi.y - vj.y) * (vi.y - vj.y) + (vi.z - vj.z) * (vi.z - vj.z));
-    }
-    bool is_valid(int i, int j,glm::vec3 p1,glm::vec3 p2, float valid_pair_threshold) { //检查编号为i 和编号为j的点是否是合法点对
-        if (distance(p1, p2) < valid_pair_threshold) {
-            return true;
-        }
-        if (edges.find(std::make_pair(i, j)) != edges.end()) {
-            return true;
-        }
-        return false;
-        
-    }
-    std::vector<int> father;//节点的父亲
-    int get_father(int x) {
-        if (father[x] == x)
-            return x;
-        father[x] = get_father(father[x]);
-        return father[x];
-    }
-    bool checkroot(int x) {
-        return get_father(x) == x;
-    }
-    void Union(int u, int v) {//把u的一串挂到v上
-        u     = get_father(u);
-        father[u] = v;
-    }
-    std::vector<glm::vec3> Pos;//存储更新后的点坐标
-    int                    pos_num;//更新后的点数
-    void SimplifyMesh(Engine::SurfaceMesh const & input, Engine::SurfaceMesh & output, float valid_pair_threshold, float simplification_ratio) {
-        /* output = input;
-        return;*/
-        DCEL links;
-        links.AddFaces(input.Indices); // initialize
-        if (! links.IsValid()) {
-            printf("links is invalid\n");
-        }
-        //初始化set edges
-        edges.clear();
-        for (DCEL::HalfEdge const * e : links.GetEdges()) {
-            if (e->From() > e->To())
-                edges.insert(std::make_pair(e->To(), e->From()));
-            else
-                edges.insert(std::make_pair(e->From(), e->To()));
-        }
-        int vertex_num = input.Positions.size();
-        Pos.clear();
-        for (int i = 0; i < vertex_num; ++i) {
-            Pos.push_back(input.Positions[i]);
-        }
-        father.clear();
-        for (int i = 0; i < vertex_num; ++i) {
-            father.push_back(i);
-        }
-        int cur = vertex_num;
-        pos_num = vertex_num;
-        printf("pos_num :%d\n", pos_num);
-        //为每个初始顶点计算二次代价矩阵Qi
-        std::vector<glm::mat4> Q(vertex_num);
-        for (DCEL::Triangle const & f : links.GetFaces()) {
-            glm::mat4 Kp = calKp(input.Positions[*f.Indices(0)], input.Positions[*f.Indices(1)], input.Positions[*f.Indices(2)]);
+            {{ 0, 0, 0 },
+             { 0, 1, 0 },
+             { 0, 0, 0 }},//[0.1,0.2)
+
+            {{ 0, 0, 0 },
+             { 1, 1, 0 },
+             { 0, 0, 0 }},
+
+            {{ 0, 0, 0 },
+             { 1, 1, 0 },
+             { 0, 1, 0 }},
+
+            {{ 0, 0, 0 },
+             { 1, 1, 1 },
+             { 0, 1, 0 }},
+
+            {{ 0, 0, 1 },
+             { 1, 1, 1 },
+             { 0, 1, 0 }},
+
+             {{ 0, 0, 1 },
+             { 1, 1, 1 },
+             { 1, 1, 0 }},
+
+             {{ 1, 0, 1 },
+             { 1, 1, 1 },
+             { 1, 1, 0 }},
+
+             {{ 1, 0, 1 },
+             { 1, 1, 1 },
+             { 1, 1, 1 }},
+
+             {{ 1, 1, 1 },
+             { 1, 1, 1 },
+             { 1, 1, 1 }},//[0.9,1)
+
+             {{ 1, 1, 1 },
+             { 1, 1, 1 },
+             { 1, 1, 1 }},//1
+        };
+        for (std::size_t x = 0; x < input.GetSizeX(); ++x) 
+            for (std::size_t y = 0; y < input.GetSizeY(); ++y) {
+            glm::vec3 color = input[{ x, y }];
+            int idx_r = (int) (10 * color.r);
+            int idx_g = (int) (10 * color.g);
+            int idx_b = (int) (10 * color.b);
             for (int i = 0; i < 3; ++i) {
-                Q[*f.Indices(i)] += Kp;
-            }
-        }
-                              
-        //按照特定规则，选择所有合法的顶点对
-        pointpair.clear();
-        for (int i = 0; i < input.Positions.size(); ++i) {
-            for (int j = 0; j < i; ++j) {
-                if (is_valid(j, i,Pos[j],Pos[i], valid_pair_threshold)) {
-                    glm::vec3 v_ = glm::vec3(0, 0, 0);
-                    //对于每一个顶点对 vi,vj，求解最优的收缩点v ，并计算它的代价
-                    float cost = cal_best(Pos[j], Pos[i], v_, Q[i] + Q[j]);
-                    pointpair.insert(point_pair(j, i, cost, v_));//编号小的放前面
-                }
-            }
-        }
-        printf("cur:%d,pos_num:%d\n", cur, pos_num);
-        printf("simplification_ratio:%f\n", simplification_ratio);
-        while (cur > vertex_num * simplification_ratio) {
-                              
-            //从顶点对中找出代价最小的那一对进行顶点合并
-            if (pointpair.empty()) {
-                //如果没有合法点对
-                break;
-            }
-            point_pair best_pair = *pointpair.begin();//set中的第一个 就是代价最小的
-            while (! checkroot(best_pair.i) || ! checkroot(best_pair.j) || best_pair.cost < 0) {
-                pointpair.erase(pointpair.begin());
-                if (pointpair.empty())
-                    break;
-                best_pair = *pointpair.begin();
-            }
-            if (pointpair.empty())
-                break;
-
-            //对选出的点进行操作
-            Pos.push_back(best_pair.v);
-            Q.push_back(Q[best_pair.i] + Q[best_pair.j]);
-
-            father.push_back(pos_num);
-            Union(best_pair.i, pos_num);
-            Union(best_pair.j, pos_num);
-
-
-             //加入新的合法点对
-            for (int j = 0; j < pos_num; j++) {
-                if (checkroot(j) && is_valid(j, pos_num, Pos[j], Pos[pos_num], valid_pair_threshold)) {
-                    glm::vec3 v_;
-                    float     cost = cal_best(Pos[j], Pos[pos_num], v_, Q[j] + Q[pos_num]);
-                    pointpair.insert(point_pair(j, pos_num, cost, v_));
-                }
-            }
-
-            //把原来的点连的边删掉 把新点该连的边加上
-            for (int k = 0; k < pos_num; k++) {
-                if (edges.find(std::make_pair(std::min(k, best_pair.i), std::max(k, best_pair.i))) != edges.end()) {
-                    edges.erase(edges.find(std::make_pair(std::min(k, best_pair.i), std::max(k, best_pair.i))));
-                    edges.insert(std::make_pair(k, pos_num));
-            }
-                if (edges.find(std::make_pair(std::min(k, best_pair.j), std::max(k, best_pair.j))) != edges.end()) {
-                    edges.erase(edges.find(std::make_pair(std::min(k, best_pair.j), std::max(k, best_pair.j))));
-                    edges.insert(std::make_pair(k, pos_num));
+                for (int j = 0; j < 3; ++j) {
+                    output.SetAt({ 3*x+i, 3*y+j }, { order[idx_r][i][j], order[idx_g][i][j], order[idx_b][i][j] });
                 }
             }
             
-            cur--;
-            pos_num++;
-            printf("cur:%d,pos_num:%d\n", cur, pos_num);
         }
-
-        for (int i = 0; i < pos_num; i++) {
-            output.Positions.push_back(Pos[i]);
-        }
-        for (int i = 0; i < input.Indices.size(); i++) {
-            output.Indices.push_back(get_father(input.Indices[i]));
-        }
-        printf("vertex_num : %d,pos_num %d:\n", vertex_num, pos_num);
-        printf("simp end\n");
     }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    /******************* 4. Mesh Smoothing *****************/
-    float COS(glm::vec3 px, glm::vec3 py) {//求两个向量的cos角
-        float dot = px.x * py.x + px.y * py.y + px.z * py.z;
-        float px_len = sqrt(px.x * px.x + px.y * px.y + px.z * px.z);//|PX|
-        float py_len = sqrt(py.x * py.x + py.y * py.y + py.z * py.z);//|PY|
-        float c      = dot / (px_len *py_len);
-        return c;
-    }
-    float Cotangent_Laplacian_w(glm::vec3 x, glm::vec3 y, glm::vec3 p, glm::vec3 q) {
-        glm::vec3 px = p - x;
-        glm::vec3 py = p - y;
-        float     c1  = COS(px, py);
-        float     ct1 = c1 / sqrt(1 - c1 * c1);
-
-        glm::vec3 qx = q - x;
-        glm::vec3 qy = q - y;
-        float     c2  = COS(qx, qy);
-        float     ct2 = c2 / sqrt(1 - c2 * c2);
-
-        return ct1 + ct2;
-    }
-    void SmoothMesh(Engine::SurfaceMesh const & input, Engine::SurfaceMesh & output, std::uint32_t numIterations, float lambda, bool useUniformWeight) {
-        DCEL links;
-        links.AddFaces(input.Indices); // initialize
-        if (! links.IsValid()) {
-            printf("links is invalid\n");
-        }
-
-        //记录 from to这条边对应的边 由点索引边
-        // from to 这条边是(unsigned long long) e->From() * oldv_cnt + e->To())，类似二维数组
-        int                                            vertex_num = input.Positions.size();
-        std::map<unsigned long long, DCEL::HalfEdge  const *> point_to_edge; 
-        
-        for (DCEL::HalfEdge const * e : links.GetEdges()) {
-            point_to_edge[(unsigned long long) e->From() * vertex_num + e->To()] = e;
-            if (e->From() == 0 && e->To() == 1) {
-                DCEL::HalfEdge const * tmp_e = e;
-                printf("0-1\n");
-            }
-           
-        }
-
-        Engine::SurfaceMesh tmp = input;
-        Engine::SurfaceMesh tmp2 = input;
-        int                 T    = numIterations;
-        while (T--) {
-            //printf("迭代第%u次\n", numIterations - T);
-            for (std::size_t i = 0; i < tmp.Positions.size(); ++i) {
-                DCEL::Vertex v = links.GetVertex(i); // get vertex with index i
-                //对每个顶点 vi ，计算邻居位置的加权平均
-                std::vector<uint32_t> Neighbor = v.GetNeighbors();
-                float                 w        = 0;
-                
-                float     w_sum        = 0;
-                glm::vec3 Position_sum = glm::vec3(0, 0, 0);
-                for (int j = 0; j < Neighbor.size(); ++j) {
-                    if (useUniformWeight) {
-                        //使用 Uniform Laplacian 时 wij=1
-                        w = 1;
-                    } else {
-                        //使用 Cotangent Laplacian 时 wij=cotaij+cotbij
-                        DCEL::HalfEdge const * e=point_to_edge[(unsigned long long)i * vertex_num + Neighbor[j]];
-                        if (!e)//如果没有(i,Neighbor[j]这条边
-                            e = point_to_edge[(unsigned long long) Neighbor[j] * vertex_num + i];
-                        w                        = Cotangent_Laplacian_w(tmp.Positions[e->From()], 
-                                                    tmp.Positions[e->To()], 
-                                                    tmp.Positions[e->OppositeVertex()], 
-                                                    tmp.Positions[e->PairOppositeVertex()]);
-                        w = std::max(std::min(w, 900.0f), 0.0f);//要限制 不然w大了有洞
-                        
-                    }
-
-                    w_sum += w;
-                    Position_sum += w * tmp.Positions[Neighbor[j]];
+    void DitheringErrorDiffuse(
+        ImageRGB &       output,
+        ImageRGB const & input) {
+        // your code here:
+        ImageRGB old_img = input;
+        for (std::size_t x = 0; x < input.GetSizeX(); ++x)
+            for (std::size_t y = 0; y < input.GetSizeY(); ++y) {
+                glm::vec3 old_color = old_img[{ x, y }];
+                glm::vec3 color     = old_img[{ x, y }]; //������
+                output.SetAt({ x, y }, {
+                                           old_color.r > 0.5 ? 1 : 0,
+                                           old_color.g > 0.5 ? 1 : 0,
+                                           old_color.b > 0.5 ? 1 : 0,
+                                       });
+                glm::vec3 quant_error = old_color - output[{ x, y }]; //ԭ���غ������صľ�������֮������
+                //�������
+                if (y + 1 < input.GetSizeY()) {
+                    color = old_img[{ x, y + 1 }];
+                    old_img.SetAt({ x, y + 1 }, {
+                                                    color.r + quant_error.r * 7 / 16,
+                                                    color.g + quant_error.g * 7 / 16,
+                                                    color.b + quant_error.b * 7 / 16,
+                                                });
                 }
-                glm::vec3 v_star_Position = Position_sum / w_sum;
-                //更新顶点：vi = (1−入) vi + 入v∗
-                glm::vec3 vi      = (1 - lambda) * tmp.Positions[i] + lambda * v_star_Position;
-                tmp2.Positions[i] = vi; //把更新后的节点暂存到tmp2
+                if (x + 1 < input.GetSizeX()) {
+                    if (y >= 1) {
+                        color = old_img[{ x + 1, y - 1 }];
+                        old_img.SetAt({ x + 1, y - 1 }, {
+                                                            color.r + quant_error.r * 3 / 16,
+                                                            color.g + quant_error.g * 3 / 16,
+                                                            color.b + quant_error.b * 3 / 16,
+                                                        });
+                    }
+                    color = old_img[{ x + 1, y }];
+                    old_img.SetAt({ x + 1, y }, {
+                                                    color.r + quant_error.r * 5 / 16,
+                                                    color.g + quant_error.g * 5 / 16,
+                                                    color.b + quant_error.b * 5 / 16,
+                                                });
+                    if (y + 1 < input.GetSizeY()) {
+                        color = old_img[{ x + 1, y + 1 }];
+                        old_img.SetAt({ x + 1, y + 1 }, {
+                                                            color.r + quant_error.r * 1 / 16,
+                                                            color.g + quant_error.g * 1 / 16,
+                                                            color.b + quant_error.b * 1 / 16,
+                                                        });
+                    }
+                }
             }
-            for (int i = 0; i < tmp.Positions.size(); ++i) {
-                tmp.Positions[i] = tmp2.Positions[i];
-            }
-        }
-        output = tmp;
     }
-    
 
-
-
-
-    /******************* 5. Marching Cubes *****************/
-    struct Vec3 {
-        float x;
-        float y;
-        float z;
-        bool  operator<(const Vec3 & v) const {
-             if (x < v.x)
-                return true;
-            if (y < v.y)
-                return true;
-            return (z < v.z);
-        }
-    };
-
-    void MarchingCubes(Engine::SurfaceMesh & output, const std::function<float(const glm::vec3 &)> & sdf, const glm::vec3 & grid_min, const float dx, const int n) {
-        glm::vec3 unit[3] = { glm::vec3(1, 0, 0),
-                              glm::vec3(0, 1, 0),
-                              glm::vec3(0, 0, 1) };
-        
-
-        //把点坐标映射到点索引 用来检测这个点生成过没有
-        std::map<Vec3, int> point_to_index;
-       
-        //扫描每个cube
-        for (int x = 0; x < n; ++x) {
-            for (int y = 0; y < n; ++y) {
-                for (int z = 0; z < n; ++z) {
-                    //v0的位置
-                    float x0 = grid_min.x + dx * x;
-                    float y0 = grid_min.y + dx * y;
-                    float z0 = grid_min.z + dx * z;
-
-                    glm::vec3 v[8];
-                    uint32_t point_state=0;//二进制记录每个顶点的距离的情况（小于等于0这一位就是1）
-                    for (int i = 0; i < 8; ++i) {
-                        //第i个顶点的位置
-                        v[i] = glm::vec3(x0 + (i & 1) * dx, y0 + (i >> 1 & 1) * dx, +z0 + (i >> 2 & 1) * dx);
-                        if (sdf(v[i]) <= 0) {
-                            point_state |= (1 << i);
+    /******************* 2.Image Filtering *****************/
+    void Blur(
+        ImageRGB &       output,
+        ImageRGB const & input) {
+        // your code here:
+        for (std::size_t x = 0; x < input.GetSizeX(); ++x)
+            for (std::size_t y = 0; y < input.GetSizeY(); ++y) {
+                glm::vec3 color = input[{ x, y }];//kernel
+                int       cnt   = 1;
+                for (int i = -1; i <= 1; ++i) {
+                    for (int j = -1; j <= 1; ++j) {
+                        if (i == 0 && j == 0)
+                            continue;//��ʼ����ʱ��ӹ���
+                        if ((int)x + i >= 0 && x + i < input.GetSizeX()&&y+j<input.GetSizeY()&&(int)y+j>=0) {
+                            color += input[{ x + i, y + j }];//����Χ�ļ�����Ȼ��ƽ��
+                            cnt++;
                         }
                     }
-                    //将在等值面之下的点映射到相交的边
-                    uint32_t edge_state = c_EdgeStateTable[point_state];
+                }
+                output.SetAt({ x, y }, {
+                                           color.r /cnt,
+                                           color.g /cnt,
+                                           color.b /cnt,
+                                       });
+            }
+    }
 
-                    int id[12];//第i条边上的点对应的index
-                    for (int j = 0; j < 12; ++j) {//扫描每条边
-                        if (edge_state & (1 << j)) {//这条边有点        
-                            glm::vec3 start = v[0] + dx*(j & 1) * unit[((j >> 2) + 1) % 3] + dx * (j >> 1 & 1) * unit[((j >> 2) + 2) % 3];
-                            glm::vec3 end   = start + unit[j >> 2]*dx;//这条边的终点
+    void Edge(
+        ImageRGB &       output,
+        ImageRGB const & input) {
+        // your code here:
+        int filter1[3][3] = {
+            {1, 0, -1},
+            {2, 0, -2},
+            {1, 0, -1}
+        };
+        int filter2[3][3] = {
+            { 1,  2,  1},
+            { 0,  0,  0},
+            {-1, -2, -1}
+        };
+        for (std::size_t x = 0; x < input.GetSizeX(); ++x)
+            for (std::size_t y = 0; y < input.GetSizeY(); ++y) {
+                if (x == 0 || y == 0 || x == input.GetSizeX() - 1 || y == input.GetSizeY() - 1) {
+                    output.SetAt({ x, y }, { 0, 0, 0 });
+                    continue;
+                }
 
-                            //计算交点坐标 P = P1 + (V – V1)·(P2 – P1)/(V2 – V1)
-                            glm::vec3 new_Position = start + (0 - sdf(start)) * (end - start) / (sdf(end) - sdf(start));
-
-                            int       pidx  = 0;
-                            if (point_to_index.count(Vec3(new_Position.x,new_Position.y,new_Position.z))) {
-                                //说明这个交点在别的cube里生成过了
-                                pidx  = point_to_index[Vec3(new_Position.x, new_Position.y, new_Position.z)];
-                                id[j] = pidx;
-                            } else {
-                                output.Positions.push_back(new_Position);
-                                pidx = output.Positions.size() - 1;
-                                point_to_index[Vec3(new_Position.x, new_Position.y, new_Position.z)] = pidx;
-                                id[j]                        = pidx;
-                            }
-                           
-                        }  
-                    }
-                    //查表 按顺序把点连成三角形 c_EdgeOrdsTable[point_state][j]表示这种情况下第几条边的点
-                    for (int j = 0; c_EdgeOrdsTable[point_state][j] != -1; ++j) {
-                        output.Indices.push_back(id[c_EdgeOrdsTable[point_state][j]]);
+                glm::vec3 color1 = input[{ x, y }];
+                color1 -= input[{ x, y }];//�����ʼ��Ϊ0����ֻ��������
+                glm::vec3 color2 = input[{ x, y }];
+                color2 -= input[{ x, y }]; //�����ʼ��Ϊ0����ֻ��������
+                for (int i = -1; i <= 1; ++i) {
+                    for (int j = -1; j <= 1; ++j) {
+                        color1.r += input[{ x + i, y + j }].r * filter1[i + 1][j + 1];
+                        color1.g += input[{ x + i, y + j }].g * filter1[i + 1][j + 1];
+                        color1.b += input[{ x + i, y + j }].b * filter1[i + 1][j + 1];
                     }
                 }
+                for (int i = -1; i <= 1; ++i) {
+                    for (int j = -1; j <= 1; ++j) {
+                        color2.r += input[{ x + i, y + j }].r * filter2[i + 1][j + 1];
+                        color2.g += input[{ x + i, y + j }].g * filter2[i + 1][j + 1];
+                        color2.b += input[{ x + i, y + j }].b * filter2[i + 1][j + 1];
+                    }
+                }
+                output.SetAt({ x, y }, {
+                                           fabs(color1.r / 4) +fabs(color2.r / 4),
+                                           fabs(color1.g / 4) +fabs(color2.g / 4),
+                                           fabs(color1.b / 4) + fabs(color2.b / 4),
+                                       });
+            }
+    }
+
+    /******************* 3. Image Inpainting *****************/
+    void Inpainting(
+        ImageRGB &         output,
+        ImageRGB const &   inputBack,
+        ImageRGB const &   inputFront,
+        const glm::ivec2 & offset) {
+        output             = inputBack;
+        size_t      width  = inputFront.GetSizeX();
+        size_t      height = inputFront.GetSizeY();
+        glm::vec3 * g      = new glm::vec3[width * height];
+        memset(g, 0, sizeof(glm::vec3) * width * height);
+        // set boundary condition
+        for (std::size_t y = 0; y < height; ++y) {
+            // set boundary for (0, y), your code: g[y * width] = ?
+            // set boundary for (width - 1, y), your code: g[y * width + width - 1] = ?
+            //�ɺ���Ĵ�����Կ����� g��Ŀ����frontͼ�Ĳ�ֵ
+            g[y * width]             = inputBack[{ (size_t) offset.x, offset.y + y }] - inputFront[{0,y}]; 
+            g[y * width + width - 1] = inputBack[{ offset.x + width - 1, offset.y + y }] - inputFront[{width-1,y}];
+        }
+        for (std::size_t x = 0; x < width; ++x) {
+            // set boundary for (x, 0), your code: g[x] = ?
+            // set boundary for (x, height - 1), your code: g[(height - 1) * width + x] = ?
+            g[x]                        = inputBack[{ offset.x + x, (size_t) offset.y }] - inputFront[{x,0}];
+            g[(height - 1) * width + x] = inputBack[{ offset.x + x, offset.y + height - 1 }] - inputFront[{x,height-1}];
+        }
+
+        // Jacobi iteration, solve Ag = b
+        for (int iter = 0; iter < 8000; ++iter) {
+            for (std::size_t y = 1; y < height - 1; ++y)
+                for (std::size_t x = 1; x < width - 1; ++x) {
+                    g[y * width + x] = (g[(y - 1) * width + x] + g[(y + 1) * width + x] + g[y * width + x - 1] + g[y * width + x + 1]);
+                    g[y * width + x] = g[y * width + x] * glm::vec3(0.25);
+                }
+        }
+
+        for (std::size_t y = 0; y < inputFront.GetSizeY(); ++y)
+            for (std::size_t x = 0; x < inputFront.GetSizeX(); ++x) {
+                glm::vec3 color = g[y * width + x] + inputFront.GetAt({ x, y });
+                output.SetAt({ x + offset.x, y + offset.y }, color);
+            }
+        delete[] g;
+    }
+
+    /******************* 4. Line Drawing *****************/
+    void DrawLine(
+        ImageRGB &       canvas,
+        glm::vec3 const  color,
+        glm::ivec2 const p0,
+        glm::ivec2 const p1) {
+        // your code here:
+        if (p0 == p1) {//�����غ�
+            canvas.SetAt({ (size_t) p0.x, (size_t) p0.y }, { color });
+            return;
+        }
+        if (p0.x == p1.x) {//��ֱ
+            size_t miny = p0.y < p1.y ? p0.y : p1.y;
+            size_t maxy = p0.y < p1.y ? p1.y : p0.y;
+            for (size_t y = miny; y <= maxy; ++y) {
+                canvas.SetAt({ (size_t) p0.x, y }, { color });
+            }
+            return;
+        }
+        float slope = ((float) (p1.y - p0.y) /(p1.x - p0.x)); //б��
+        if (slope >= 0 && slope < 1) {
+            size_t x0 = p0.x < p1.x ? p0.x : p1.x;//x0<x1
+            size_t x1 = p0.x < p1.x ? p1.x : p0.x;
+            size_t y0 = p0.x < p1.x ? p0.y : p1.y;
+            size_t y1 = p0.x < p1.x ? p1.y : p0.y;
+            size_t x    = x0;
+            size_t y    = y0;
+            int dx   = 2 * (x1 - x0);
+            int dy   = 2 * (y1 - y0);
+            int dydx = dy - dx;
+            int F = dy - dx / 2;
+            for (x = x0; x <= x1; ++x) {
+                canvas.SetAt({ x, y }, { color });
+                if (F < 0)
+                    F += dy;
+                else {
+                    y++;
+                    F += dydx;
+                }
+            }
+            return;
+        }
+        if (slope >= 1) {//��0��1֮��������x��y������
+            size_t y0   = p0.y < p1.y ? p0.y : p1.y; // y0<y1
+            size_t y1   = p0.y < p1.y ? p1.y : p0.y;
+            size_t x0   = p0.y < p1.y ? p0.x : p1.x;
+            size_t x1   = p0.y < p1.y ? p1.x : p0.x;
+            size_t x    = x0;
+            size_t y    = y0;
+            int    dx   = 2 * (x1 - x0);
+            int    dy   = 2 * (y1 - y0);
+            int    dydx = dx - dy;
+            int    F    = dx - dy / 2;
+            for (y = y0; y <= y1; ++y) {
+                canvas.SetAt({ x, y }, { color });
+                if (F < 0)
+                    F += dx;
+                else {
+                    x++;
+                    F += dydx;
+                }
+            }
+            return;
+        }
+        if (slope <0 && slope > -1) {//x���-x
+            size_t x0   = p0.x < p1.x ? p1.x : p0.x; // x0>x1
+            size_t x1   = p0.x < p1.x ? p0.x : p1.x;
+            size_t y0   = p0.x < p1.x ? p1.y : p0.y;
+            size_t y1   = p0.x < p1.x ? p0.y : p1.y;
+            size_t x    = x0;
+            size_t y    = y0;
+            int    dx   = 2 * (-x1 + x0);
+            int    dy   = 2 * (y1 - y0);
+            int    dydx = dy - dx;
+            int    F    = dy - dx / 2;
+            for (x = x0; x >= x1; --x) {
+                canvas.SetAt({ x, y }, { color });
+                if (F < 0)
+                    F += dy;
+                else {
+                    y++;
+                    F += dydx;
+                }
+            }
+            return;
+        }
+        if (slope <=-1) {                            //��0��1֮��������x��y������ x���-x
+            size_t y0   = p0.y < p1.y ? p0.y : p1.y; // y0<y1
+            size_t y1   = p0.y < p1.y ? p1.y : p0.y;
+            size_t x0   = p0.y < p1.y ? p0.x : p1.x;
+            size_t x1   = p0.y < p1.y ? p1.x : p0.x;
+            size_t x    = x0;
+            size_t y    = y0;
+            int    dx   = 2 * (-x1 + x0);
+            int    dy   = 2 * (y1 - y0);
+            int    dydx = dx - dy;
+            int    F    = dx - dy / 2;
+            for (y = y0; y <= y1; ++y) {
+                canvas.SetAt({ x, y }, { color });
+                if (F < 0)
+                    F += dx;
+                else {
+                    x--;
+                    F += dydx;
+                }
+            }
+            return;
+        }
+    }
+
+    /******************* 5. Triangle Drawing *****************/
+    void DrawTriangleFilled(
+        ImageRGB &       canvas,
+        glm::vec3 const  color,
+        glm::ivec2 const p0,
+        glm::ivec2 const p1,
+        glm::ivec2 const p2) {
+        // your code here:
+        //�������˻�Ϊֱ�ߵ����
+        //���������غ�
+        if (p0 == p1) {
+            DrawLine(canvas, color, p0, p2);
+            return;
+        }
+        if (p0 == p2) {
+            DrawLine(canvas, color, p0, p1);
+            return;
+        }
+        if (p1 == p2) {
+            DrawLine(canvas, color, p0, p1);
+            return;
+        }
+        //���㹲��
+        if ((p0.y - p1.y) * (p1.x - p2.x) == (p1.y - p2.y) * (p0.x - p1.x)) {
+            DrawLine(canvas, color, p0, p1);
+            DrawLine(canvas, color, p2, p1);
+            DrawLine(canvas, color, p0, p2);//�����ж��ĸ�����ͷ���� �ɴ�ȫ���� �������غ�
+            return;
+        }
+        size_t x_up = p0.y > p1.y ? (p1.y > p2.y ? p2.x : p1.x) : (p0.y > p2.y ? p2.x : p0.x);
+        size_t y_up = p0.y > p1.y ? (p1.y > p2.y ? p2.y : p1.y) : (p0.y > p2.y ? p2.y : p0.y); //��������ĵ� Ҳ����y��С
+        size_t x_down = p0.x > p1.x ? (p0.y > p2.y ? p0.x : p2.x) : (p1.y > p2.y ? p1.x : p2.x);
+        size_t y_down = p0.y > p1.y ? (p0.y > p2.y ? p0.y : p2.y) : (p1.y > p2.y ? p1.y : p2.y); //������ĵ� y���ĵ�
+        size_t x_m     = p0.x + p1.x + p2.x - x_up - x_down;//y�����м�ĵ�
+        size_t y_m     = p0.y + p1.y + p2.y - y_up - y_down;
+        //���м仭һ��ˮƽ���г�����
+        size_t x_tmp = ((float)x_up - x_down) / ((float)y_up - y_down) * (y_m - y_up) + x_up;
+        size_t xL    = x_m < x_tmp ? x_m : x_tmp;
+        size_t xR    = x_m > x_tmp ? x_m : x_tmp;
+        int  dxL   = (int)x_up - xL;
+        int  dyL   = (int)y_up - y_m;
+        int    dxR   = (int) x_up - xR;
+        int    dyR   = (int) y_up - y_m;
+        if (dyL == 0 || dyR == 0) {//���������������ƽ��
+               //ʲô������
+        } 
+        else {
+            float dxdyL = (float) dxL / dyL;
+            float dxdyR = (float) dxR / dyR;
+            //��ʼ��
+            float xl = x_up;
+            float xr = x_up;
+            for (size_t y = y_up; y <= y_m; ++y) { // for each scanline at y
+                for (size_t x = xl; x <= xr; ++x) {
+                    canvas.SetAt({ x, y }, { color });
+                }
+                xl += dxdyL;
+                xr += dxdyR;
             }
         }
-        
+        //�ٻ��°벿��
+        dxL = (int) x_down - xL;
+        dyL   = (int) y_down - y_m;
+        dxR   = (int) x_down - xR;
+        dyR   = (int) y_down - y_m;
+        if (dyL == 0 || dyR == 0) {
+            //������������ƽ�� ʲôҲ���� 
+        } else {
+            float dxdyL = (float) dxL / dyL;
+            float dxdyR = (float) dxR / dyR;
+            float xl    = x_down;
+            float xr    = x_down;
+            for (size_t y = y_down; y >= y_m; --y) { // for each scanline at y
+                for (size_t x = xl; x <= xr; ++x) {
+                    canvas.SetAt({ x, y }, { color });
+                }
+                xl -= dxdyL;
+                xr -= dxdyR;
+            }
+        }
     }
-} // namespace VCX::Labs::GeometryProcessing
+
+    /******************* 6. Image Supersampling *****************/
+    void Supersample(
+        ImageRGB &       output,
+        ImageRGB const & input,
+        int              rate) {
+        // your code here:
+        //input 2500*2500 output 320*320 
+        for (std::size_t x = 0; x < output.GetSizeX(); ++x)
+            for (std::size_t y = 0; y < output.GetSizeY(); ++y) {
+                glm::vec3 color = input[{ x, y }];
+                //output�е�x y������input�е�125/16x 125/16y����߱ߵ�319������2492��
+                //����Χ��8*8�����в��� x yΪ���Ϸ��Ǹ�
+                float r = 0;
+                float g = 0;
+                float b = 0;
+                for (int cnt = 0; cnt < rate; ++cnt) {
+                    int i = rand() % 8;
+                    int j = rand() % 8;
+                    r += input[{ x * 125 / 16 + i, y * 125 / 16 + j }].r;
+                    g += input[{ x * 125 / 16 + i, y * 125 / 16 + j }].g;
+                    b += input[{ x * 125 / 16 + i, y * 125 / 16 + j }].b;
+                }
+                r /= rate;
+                g /= rate;
+                b /= rate;
+                output.SetAt({ x, y }, { r, g, b });
+            }
+    }
+
+    /******************* 7. Bezier Curve *****************/
+    glm::vec2 CalculateBezierPoint(
+        std::span<glm::vec2> points,
+        float const          t) {
+        // your code here:
+        //t��[0,1]֮����Ǹ���������
+        glm::vec2 curve = { 0, 0 };
+        int       n = points.size();
+        for (int i = 0; i < n; ++i) {
+            glm::vec2 p = points[i];
+            curve.x += C(n - 1, i) * p.x * pow((1 - t), n - 1 - i) * pow(t, i);
+            curve.y += C(n - 1, i) * p.y * pow((1 - t), n - 1 - i) * pow(t, i);
+        }
+        return curve;
+    }
+} // namespace VCX::Labs::Drawing2D
