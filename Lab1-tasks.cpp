@@ -43,8 +43,8 @@ namespace VCX::Labs::Drawing2D {
         for (std::size_t x = 0; x < input.GetSizeX(); ++x)
             for (std::size_t y = 0; y < input.GetSizeY(); ++y) {
 
-                double a = rand() / (double) (RAND_MAX); //²úÉú0-1Ö®¼äµÄËæ»úÊı
-                a -= 0.5;                                //-0.5µ½0.5Ö®¼äµÄËæ»úÊı
+                double a = rand() / (double) (RAND_MAX); //äº§ç”Ÿ0-1ä¹‹é—´çš„éšæœºæ•°
+                a -= 0.5;                                //-0.5åˆ°0.5ä¹‹é—´çš„éšæœºæ•°
                 glm::vec3 color = input[{ x, y }];
                 output.SetAt({ x, y }, {
                                            color.r+a > 0.5 ? 1 : 0,
@@ -62,7 +62,7 @@ namespace VCX::Labs::Drawing2D {
         for (std::size_t x = 0; x < input.GetSizeX(); ++x)
             for (std::size_t y = 0; y < input.GetSizeY(); ++y) {
                 glm::vec3 color1 = input[{ x, y }];
-                glm::vec3 color2 = noise[{ x, y }];//0-1Ö®¼ä
+                glm::vec3 color2 = noise[{ x, y }];//0-1ä¹‹é—´
                 output.SetAt({ x, y }, {
                                            color1.r+color2.r-0.5 > 0.5 ? 1 : 0,
                                            color1.g+color2.g-0.5 > 0.5 ? 1 : 0,
@@ -143,14 +143,14 @@ namespace VCX::Labs::Drawing2D {
         for (std::size_t x = 0; x < input.GetSizeX(); ++x)
             for (std::size_t y = 0; y < input.GetSizeY(); ++y) {
                 glm::vec3 old_color = old_img[{ x, y }];
-                glm::vec3 color     = old_img[{ x, y }]; //ºóÃæÓÃ
+                glm::vec3 color     = old_img[{ x, y }]; //åé¢ç”¨
                 output.SetAt({ x, y }, {
                                            old_color.r > 0.5 ? 1 : 0,
                                            old_color.g > 0.5 ? 1 : 0,
                                            old_color.b > 0.5 ? 1 : 0,
                                        });
-                glm::vec3 quant_error = old_color - output[{ x, y }]; //Ô­ÏñËØºÍĞÂÏñËØµÄ¾­¹ıÉáÈëÖ®ºóµÄÎó²î
-                //·ÖÅäÎó²î
+                glm::vec3 quant_error = old_color - output[{ x, y }]; //åŸåƒç´ å’Œæ–°åƒç´ çš„ç»è¿‡èˆå…¥ä¹‹åçš„è¯¯å·®
+                //åˆ†é…è¯¯å·®
                 if (y + 1 < input.GetSizeY()) {
                     color = old_img[{ x, y + 1 }];
                     old_img.SetAt({ x, y + 1 }, {
@@ -198,9 +198,9 @@ namespace VCX::Labs::Drawing2D {
                 for (int i = -1; i <= 1; ++i) {
                     for (int j = -1; j <= 1; ++j) {
                         if (i == 0 && j == 0)
-                            continue;//³õÊ¼»¯µÄÊ±ºò¼Ó¹ıÁË
+                            continue;//åˆå§‹åŒ–çš„æ—¶å€™åŠ è¿‡äº†
                         if ((int)x + i >= 0 && x + i < input.GetSizeX()&&y+j<input.GetSizeY()&&(int)y+j>=0) {
-                            color += input[{ x + i, y + j }];//°ÑÖÜÎ§µÄ¼ÓÆğÀ´È»ºóÆ½¾ù
+                            color += input[{ x + i, y + j }];//æŠŠå‘¨å›´çš„åŠ èµ·æ¥ç„¶åå¹³å‡
                             cnt++;
                         }
                     }
@@ -235,9 +235,9 @@ namespace VCX::Labs::Drawing2D {
                 }
 
                 glm::vec3 color1 = input[{ x, y }];
-                color1 -= input[{ x, y }];//²»»á³õÊ¼»¯Îª0¡£¡£Ö»ÄÜÕâÑùÁË
+                color1 -= input[{ x, y }];//ä¸ä¼šåˆå§‹åŒ–ä¸º0ã€‚ã€‚åªèƒ½è¿™æ ·äº†
                 glm::vec3 color2 = input[{ x, y }];
-                color2 -= input[{ x, y }]; //²»»á³õÊ¼»¯Îª0¡£¡£Ö»ÄÜÕâÑùÁË
+                color2 -= input[{ x, y }]; //ä¸ä¼šåˆå§‹åŒ–ä¸º0ã€‚ã€‚åªèƒ½è¿™æ ·äº†
                 for (int i = -1; i <= 1; ++i) {
                     for (int j = -1; j <= 1; ++j) {
                         color1.r += input[{ x + i, y + j }].r * filter1[i + 1][j + 1];
@@ -275,7 +275,7 @@ namespace VCX::Labs::Drawing2D {
         for (std::size_t y = 0; y < height; ++y) {
             // set boundary for (0, y), your code: g[y * width] = ?
             // set boundary for (width - 1, y), your code: g[y * width + width - 1] = ?
-            //ÓÉºóÃæµÄ´úÂë¿ÉÒÔ¿´³öÀ´ gÊÇÄ¿±êÓëfrontÍ¼µÄ²îÖµ
+            //ç”±åé¢çš„ä»£ç å¯ä»¥çœ‹å‡ºæ¥ gæ˜¯ç›®æ ‡ä¸frontå›¾çš„å·®å€¼
             g[y * width]             = inputBack[{ (size_t) offset.x, offset.y + y }] - inputFront[{0,y}]; 
             g[y * width + width - 1] = inputBack[{ offset.x + width - 1, offset.y + y }] - inputFront[{width-1,y}];
         }
@@ -310,11 +310,11 @@ namespace VCX::Labs::Drawing2D {
         glm::ivec2 const p0,
         glm::ivec2 const p1) {
         // your code here:
-        if (p0 == p1) {//Á½µãÖØºÏ
+        if (p0 == p1) {//ä¸¤ç‚¹é‡åˆ
             canvas.SetAt({ (size_t) p0.x, (size_t) p0.y }, { color });
             return;
         }
-        if (p0.x == p1.x) {//´¹Ö±
+        if (p0.x == p1.x) {//å‚ç›´
             size_t miny = p0.y < p1.y ? p0.y : p1.y;
             size_t maxy = p0.y < p1.y ? p1.y : p0.y;
             for (size_t y = miny; y <= maxy; ++y) {
@@ -322,7 +322,7 @@ namespace VCX::Labs::Drawing2D {
             }
             return;
         }
-        float slope = ((float) (p1.y - p0.y) /(p1.x - p0.x)); //Ğ±ÂÊ
+        float slope = ((float) (p1.y - p0.y) /(p1.x - p0.x)); //æ–œç‡
         if (slope >= 0 && slope < 1) {
             size_t x0 = p0.x < p1.x ? p0.x : p1.x;//x0<x1
             size_t x1 = p0.x < p1.x ? p1.x : p0.x;
@@ -345,7 +345,7 @@ namespace VCX::Labs::Drawing2D {
             }
             return;
         }
-        if (slope >= 1) {//°Ñ0µ½1Ö®¼äµÄÇé¿öµÄxºÍy·´¹ıÀ´
+        if (slope >= 1) {//æŠŠ0åˆ°1ä¹‹é—´çš„æƒ…å†µçš„xå’Œyåè¿‡æ¥
             size_t y0   = p0.y < p1.y ? p0.y : p1.y; // y0<y1
             size_t y1   = p0.y < p1.y ? p1.y : p0.y;
             size_t x0   = p0.y < p1.y ? p0.x : p1.x;
@@ -367,7 +367,7 @@ namespace VCX::Labs::Drawing2D {
             }
             return;
         }
-        if (slope <0 && slope > -1) {//x±ä³É-x
+        if (slope <0 && slope > -1) {//xå˜æˆ-x
             size_t x0   = p0.x < p1.x ? p1.x : p0.x; // x0>x1
             size_t x1   = p0.x < p1.x ? p0.x : p1.x;
             size_t y0   = p0.x < p1.x ? p1.y : p0.y;
@@ -389,7 +389,7 @@ namespace VCX::Labs::Drawing2D {
             }
             return;
         }
-        if (slope <=-1) {                            //°Ñ0µ½1Ö®¼äµÄÇé¿öµÄxºÍy·´¹ıÀ´ x±ä³É-x
+        if (slope <=-1) {                            //æŠŠ0åˆ°1ä¹‹é—´çš„æƒ…å†µçš„xå’Œyåè¿‡æ¥ xå˜æˆ-x
             size_t y0   = p0.y < p1.y ? p0.y : p1.y; // y0<y1
             size_t y1   = p0.y < p1.y ? p1.y : p0.y;
             size_t x0   = p0.y < p1.y ? p0.x : p1.x;
@@ -421,8 +421,8 @@ namespace VCX::Labs::Drawing2D {
         glm::ivec2 const p1,
         glm::ivec2 const p2) {
         // your code here:
-        //ÏÈÌØÅĞÍË»¯ÎªÖ±ÏßµÄÇé¿ö
-        //ÓĞÁ½¸öµãÖØºÏ
+        //å…ˆç‰¹åˆ¤é€€åŒ–ä¸ºç›´çº¿çš„æƒ…å†µ
+        //æœ‰ä¸¤ä¸ªç‚¹é‡åˆ
         if (p0 == p1) {
             DrawLine(canvas, color, p0, p2);
             return;
@@ -435,20 +435,20 @@ namespace VCX::Labs::Drawing2D {
             DrawLine(canvas, color, p0, p1);
             return;
         }
-        //Èıµã¹²Ïß
+        //ä¸‰ç‚¹å…±çº¿
         if ((p0.y - p1.y) * (p1.x - p2.x) == (p1.y - p2.y) * (p0.x - p1.x)) {
             DrawLine(canvas, color, p0, p1);
             DrawLine(canvas, color, p2, p1);
-            DrawLine(canvas, color, p0, p2);//ÀÁµÃÅĞ¶ÏÄÄ¸öÊÇÁ½Í·µÄÁË ¸É´àÈ«»­ÉÏ ·´Õı»áÖØºÏ
+            DrawLine(canvas, color, p0, p2);//æ‡’å¾—åˆ¤æ–­å“ªä¸ªæ˜¯ä¸¤å¤´çš„äº† å¹²è„†å…¨ç”»ä¸Š åæ­£ä¼šé‡åˆ
             return;
         }
         size_t x_up = p0.y > p1.y ? (p1.y > p2.y ? p2.x : p1.x) : (p0.y > p2.y ? p2.x : p0.x);
-        size_t y_up = p0.y > p1.y ? (p1.y > p2.y ? p2.y : p1.y) : (p0.y > p2.y ? p2.y : p0.y); //ÔÚ×îÉÏÃæµÄµã Ò²¾ÍÊÇy×îĞ¡
+        size_t y_up = p0.y > p1.y ? (p1.y > p2.y ? p2.y : p1.y) : (p0.y > p2.y ? p2.y : p0.y); //åœ¨æœ€ä¸Šé¢çš„ç‚¹ ä¹Ÿå°±æ˜¯yæœ€å°
         size_t x_down = p0.x > p1.x ? (p0.y > p2.y ? p0.x : p2.x) : (p1.y > p2.y ? p1.x : p2.x);
-        size_t y_down = p0.y > p1.y ? (p0.y > p2.y ? p0.y : p2.y) : (p1.y > p2.y ? p1.y : p2.y); //×îÏÂÃæµÄµã y×î´óµÄµã
-        size_t x_m     = p0.x + p1.x + p2.x - x_up - x_down;//y´¦ÓÚÖĞ¼äµÄµã
+        size_t y_down = p0.y > p1.y ? (p0.y > p2.y ? p0.y : p2.y) : (p1.y > p2.y ? p1.y : p2.y); //æœ€ä¸‹é¢çš„ç‚¹ yæœ€å¤§çš„ç‚¹
+        size_t x_m     = p0.x + p1.x + p2.x - x_up - x_down;//yå¤„äºä¸­é—´çš„ç‚¹
         size_t y_m     = p0.y + p1.y + p2.y - y_up - y_down;
-        //´ÓÖĞ¼ä»­Ò»ÌõË®Æ½ÏßÇĞ³ÉÁ½°ë
+        //ä»ä¸­é—´ç”»ä¸€æ¡æ°´å¹³çº¿åˆ‡æˆä¸¤åŠ
         size_t x_tmp = ((float)x_up - x_down) / ((float)y_up - y_down) * (y_m - y_up) + x_up;
         size_t xL    = x_m < x_tmp ? x_m : x_tmp;
         size_t xR    = x_m > x_tmp ? x_m : x_tmp;
@@ -456,13 +456,13 @@ namespace VCX::Labs::Drawing2D {
         int  dyL   = (int)y_up - y_m;
         int    dxR   = (int) x_up - xR;
         int    dyR   = (int) y_up - y_m;
-        if (dyL == 0 || dyR == 0) {//Èç¹ûÈı½ÇĞÎÉÏÃæÊÇÆ½µÄ
-               //Ê²Ã´¶¼²»×ö
+        if (dyL == 0 || dyR == 0) {//å¦‚æœä¸‰è§’å½¢ä¸Šé¢æ˜¯å¹³çš„
+               //ä»€ä¹ˆéƒ½ä¸åš
         } 
         else {
             float dxdyL = (float) dxL / dyL;
             float dxdyR = (float) dxR / dyR;
-            //³õÊ¼»¯
+            //åˆå§‹åŒ–
             float xl = x_up;
             float xr = x_up;
             for (size_t y = y_up; y <= y_m; ++y) { // for each scanline at y
@@ -473,13 +473,13 @@ namespace VCX::Labs::Drawing2D {
                 xr += dxdyR;
             }
         }
-        //ÔÙ»­ÏÂ°ë²¿·Ö
+        //å†ç”»ä¸‹åŠéƒ¨åˆ†
         dxL = (int) x_down - xL;
         dyL   = (int) y_down - y_m;
         dxR   = (int) x_down - xR;
         dyR   = (int) y_down - y_m;
         if (dyL == 0 || dyR == 0) {
-            //Èı½ÇĞÎÏÂÃæÊÇÆ½µÄ Ê²Ã´Ò²²»×ö 
+            //ä¸‰è§’å½¢ä¸‹é¢æ˜¯å¹³çš„ ä»€ä¹ˆä¹Ÿä¸åš 
         } else {
             float dxdyL = (float) dxL / dyL;
             float dxdyR = (float) dxR / dyR;
@@ -505,8 +505,8 @@ namespace VCX::Labs::Drawing2D {
         for (std::size_t x = 0; x < output.GetSizeX(); ++x)
             for (std::size_t y = 0; y < output.GetSizeY(); ++y) {
                 glm::vec3 color = input[{ x, y }];
-                //outputÖĞµÄx yÀ´×ÔÓÚinputÖĞµÄ125/16x 125/16y£¨×î±ß±ßµÄ319À´×ÔÓÚ2492£©
-                //ÔÚÖÜÎ§µÄ8*8¸öµãÖĞ²ÉÑù x yÎª×óÉÏ·½ÄÇ¸ö
+                //outputä¸­çš„x yæ¥è‡ªäºinputä¸­çš„125/16x 125/16yï¼ˆæœ€è¾¹è¾¹çš„319æ¥è‡ªäº2492ï¼‰
+                //åœ¨å‘¨å›´çš„8*8ä¸ªç‚¹ä¸­é‡‡æ · x yä¸ºå·¦ä¸Šæ–¹é‚£ä¸ª
                 float r = 0;
                 float g = 0;
                 float b = 0;
@@ -529,7 +529,7 @@ namespace VCX::Labs::Drawing2D {
         std::span<glm::vec2> points,
         float const          t) {
         // your code here:
-        //tÊÇ[0,1]Ö®¼äµÄÄÇ¸ö±ÈÀıµÄÊı
+        //tæ˜¯[0,1]ä¹‹é—´çš„é‚£ä¸ªæ¯”ä¾‹çš„æ•°
         glm::vec2 curve = { 0, 0 };
         int       n = points.size();
         for (int i = 0; i < n; ++i) {
